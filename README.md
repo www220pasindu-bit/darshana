@@ -30,7 +30,10 @@ input, button, select {padding:5px; margin:5px;}
 <label>Start Date: <input type="date" id="start"></label>
 <button onclick="generateSchedule()">Generate Schedule</button>
 <button class="resetBtn" onclick="resetAll()">Reset All</button>
-<button onclick="generateReport()">Monthly Report</button>
+<button onclick="generateReport()">Monthly Report</button><br>
+
+<label>Select Poya/Holiday Date: <input type="date" id="poyaDate"></label>
+<button onclick="markPoya()">Mark Poya / Holiday</button>
 
 <table id="scheduleTable">
 <thead>
@@ -43,14 +46,8 @@ input, button, select {padding:5px; margin:5px;}
 
 <script>
 // Live clock
-function updateTime(){
-  document.getElementById("time").innerText = new Date().toLocaleTimeString();
-}
+function updateTime(){ document.getElementById("time").innerText = new Date().toLocaleTimeString(); }
 setInterval(updateTime,1000); updateTime();
-
-// Poya / National holidays example
-const poyaDates = ['2026-04-05','2026-04-19','2026-05-04']; 
-const nationalHolidays = ['2026-04-14','2026-05-01']; 
 
 let attendanceData = [];
 
@@ -69,20 +66,14 @@ function generateSchedule(){
   const days=['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
 
   for(let i=0;i<30;i++){
-    let d = new Date(startDate);
-    d.setDate(startDate.getDate()+i);
+    let d = new Date(startDate); d.setDate(startDate.getDate()+i);
     const dateStr = d.toISOString().split('T')[0];
     const shiftType = shifts[i % shifts.length];
     const shiftClass = shiftType==='Day'?'dayShift':(shiftType==='Night'?'nightShift':'offDay');
-    const isPoya = poyaDates.includes(dateStr);
-    const isHoliday = nationalHolidays.includes(dateStr);
 
-    attendanceData.push({checkIn:'',checkOut:'',late:0,off:shiftType==='Off',poya:isPoya||isHoliday});
+    attendanceData.push({checkIn:'',checkOut:'',late:0,off:shiftType==='Off',poya:false});
 
-    const tr = document.createElement('tr'); tr.id='row'+i;
-    tr.className = shiftClass;
-    if(isPoya||isHoliday) tr.classList.add('poya');
-
+    const tr = document.createElement('tr'); tr.id='row'+i; tr.className=shiftClass;
     tr.innerHTML = `<td>${d.toLocaleDateString('en-GB')}</td>
       <td>${days[d.getDay()]}</td>
       <td class="${shiftClass}" id="shift${i}">${shiftType}</td>
@@ -91,7 +82,7 @@ function generateSchedule(){
       <td id="out${i}"><button onclick="checkOut(${i})">Check Out</button></td>
       <td id="late${i}">0</td>
       <td id="off${i}">${shiftType==='Off'?'Off':'Work'}</td>
-      <td>${isPoya||isHoliday?'Yes':'No'}</td>`;
+      <td id="poya${i}">${attendanceData[i].poya?'Yes':'No'}</td>`;
     tbody.appendChild(tr);
   }
 }
@@ -102,8 +93,7 @@ function checkIn(i){
   document.getElementById('in'+i).innerText = attendanceData[i].checkIn;
 
   if(attendanceData[i].off){ 
-    attendanceData[i].off=false;
-    document.getElementById('off'+i).innerText='Work';
+    attendanceData[i].off=false; document.getElementById('off'+i).innerText='Work';
   }
 
   calculateLate(i, now);
@@ -129,6 +119,22 @@ function calculateLate(i, now){
   document.getElementById('late'+i).innerText=late;
 }
 
+function markPoya(){
+  const selDate = document.getElementById('poyaDate').value;
+  if(!selDate) return alert('Select a date!');
+  for(let i=0;i<attendanceData.length;i++){
+    const rowDate = document.getElementById('row'+i).children[0].innerText;
+    const parts=rowDate.split('/');
+    const formatted = `2026-${parts[1].padStart(2,'0')}-${parts[0].padStart(2,'0')}`;
+    if(formatted===selDate){
+      attendanceData[i].poya=true;
+      document.getElementById('poya'+i).innerText='Yes';
+      document.getElementById('row'+i).classList.add('poya');
+      break;
+    }
+  }
+}
+
 function resetAll(){
   for(let i=0;i<attendanceData.length;i++){
     attendanceData[i].checkIn=''; attendanceData[i].checkOut=''; attendanceData[i].late=0;
@@ -136,7 +142,8 @@ function resetAll(){
     document.getElementById('out'+i).innerHTML='<button onclick="checkOut('+i+')">Check Out</button>';
     document.getElementById('late'+i).innerText='0';
     document.getElementById('off'+i).innerText=attendanceData[i].off?'Off':'Work';
-    document.getElementById('row'+i).classList.remove('attended');
+    document.getElementById('poya'+i).innerText=attendanceData[i].poya?'Yes':'No';
+    document.getElementById('row'+i).classList.remove('attended','poya');
   }
 }
 

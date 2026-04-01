@@ -3,26 +3,21 @@
 <head>
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Shift Tracker PRO</title>
-
 <style>
 body {font-family: Arial; background:#121212; color:#fff; text-align:center;}
 table {border-collapse: collapse; width:95%; margin:auto;}
 th, td {border:1px solid #fff; padding:6px;}
 th {background:#333;}
-
 .dayShift {background:#4caf50; color:#000;}
 .nightShift {background:#2196f3;}
 .offDay {background:#f44336;}
-
 .attended {background:#ffeb3b; color:#000;}
 .poya {background:#ffa726; color:#000;}
-
 button {padding:5px; margin:3px;}
 </style>
 </head>
 
 <body>
-
 <h2>Shift Tracker PRO</h2>
 <p id="time"></p>
 
@@ -34,11 +29,10 @@ Start Date: <input type="date" id="start">
 <button onclick="report()">Report</button>
 
 <br><br>
-
-<!-- ✅ NEW DATE RESET -->
+<!-- ✅ Date Reset Section -->
 <label>Select Date to Reset: </label>
 <input type="date" id="resetDate">
-<button onclick="resetByDate()">Reset Selected Date</button>
+<button id="resetBtn">Reset Selected Date</button>
 
 <table id="tbl">
 <thead>
@@ -52,18 +46,15 @@ Start Date: <input type="date" id="start">
 </table>
 
 <script>
-
-// clock
+// Live clock
 setInterval(()=>{
  document.getElementById("time").innerText=new Date().toLocaleTimeString();
 },1000);
 
-// load saved data
+// localStorage load
 let data = JSON.parse(localStorage.getItem("shiftData")) || {};
 
-function getMonthKey(date){
-  return date.getFullYear()+"-"+(date.getMonth()+1);
-}
+function getMonthKey(date){ return date.getFullYear()+"-"+(date.getMonth()+1); }
 
 function generate(){
  const start=document.getElementById("start").value;
@@ -117,106 +108,98 @@ function generate(){
  localStorage.setItem("shiftData",JSON.stringify(data));
 }
 
-// check in
+// Check In
 function cin(i){
  const now=new Date();
- const monthKey=Object.keys(data).slice(-1)[0];
+ const start=document.getElementById("start").value;
+ const monthKey = getMonthKey(new Date(start));
 
  data[monthKey][i].in=now.toLocaleTimeString();
-
- if(data[monthKey][i].off){
-   data[monthKey][i].off=false;
- }
-
+ if(data[monthKey][i].off) data[monthKey][i].off=false;
  lateCalc(i,now);
  saveReload();
 }
 
-// check out
+// Check Out
 function cout(i){
  const now=new Date();
- const monthKey=Object.keys(data).slice(-1)[0];
+ const start=document.getElementById("start").value;
+ const monthKey = getMonthKey(new Date(start));
 
  if(!data[monthKey][i].in) return alert("Check In first");
-
  data[monthKey][i].out=now.toLocaleTimeString();
  saveReload();
 }
 
-// late calc
+// Late Calculation
 function lateCalc(i,now){
- const monthKey=Object.keys(data).slice(-1)[0];
+ const start=document.getElementById("start").value;
+ const monthKey = getMonthKey(new Date(start));
 
- if(data[monthKey][i].off || data[monthKey][i].poya){
-   data[monthKey][i].late=0;
-   return;
- }
-
+ if(data[monthKey][i].off || data[monthKey][i].poya){data[monthKey][i].late=0; return;}
  const shift=document.getElementById("s"+i).innerText;
- const start=shift==='Day'?6:18;
-
- data[monthKey][i].late=Math.max(0,(now.getHours()-start)*60+now.getMinutes());
+ const startHour=shift==='Day'?6:18;
+ data[monthKey][i].late=Math.max(0,(now.getHours()-startHour)*60+now.getMinutes());
 }
 
-// mark poya
+// Mark Poya
 function poya(i){
- const monthKey=Object.keys(data).slice(-1)[0];
+ const start=document.getElementById("start").value;
+ const monthKey = getMonthKey(new Date(start));
  data[monthKey][i].poya=true;
  saveReload();
 }
 
-// reset single row
+// Reset single row
 function resetDay(i){
- const monthKey=Object.keys(data).slice(-1)[0];
+ const start=document.getElementById("start").value;
+ const monthKey = getMonthKey(new Date(start));
  data[monthKey][i]={in:'',out:'',late:0,off:true,poya:false};
  saveReload();
 }
 
-// ✅ RESET BY DATE
+// ✅ Reset by selected date
 function resetByDate(){
   const sel = document.getElementById("resetDate").value;
   if(!sel) return alert("Select date!");
-
-  const monthKey = Object.keys(data).slice(-1)[0];
+  const start=document.getElementById("start").value;
+  if(!start) return alert("Generate schedule first!");
+  const monthKey = getMonthKey(new Date(start));
 
   for(let i=0;i<data[monthKey].length;i++){
-
     const rowDate = document.getElementById("r"+i).children[0].innerText;
     const parts = rowDate.split('/');
     const formatted = `${parts[2]}-${parts[1]}-${parts[0]}`;
 
-    if(formatted === sel){
+    if(formatted===sel){
       data[monthKey][i]={in:'',out:'',late:0,off:true,poya:false};
       saveReload();
       alert("Selected day reset!");
       return;
     }
   }
-
   alert("Date not found!");
 }
 
-// save reload
+// Save & reload
 function saveReload(){
  localStorage.setItem("shiftData",JSON.stringify(data));
  generate();
 }
 
-// report
+// Monthly Report
 function report(){
- const monthKey=Object.keys(data).slice(-1)[0];
+ const start=document.getElementById("start").value;
+ if(!start) return alert("Generate schedule first!");
+ const monthKey = getMonthKey(new Date(start));
  let w=window.open("","","width=800,height=600");
-
  w.document.write("<h2>Monthly Report</h2><table border=1>");
  w.document.write("<tr><th>Date</th><th>Shift</th><th>In</th><th>Out</th><th>Late</th><th>Status</th><th>Poya</th></tr>");
-
  for(let i=0;i<data[monthKey].length;i++){
    const d=document.getElementById("r"+i).children[0].innerText;
    const s=document.getElementById("s"+i).innerText;
-
    w.document.write(`<tr>
-   <td>${d}</td>
-   <td>${s}</td>
+   <td>${d}</td><td>${s}</td>
    <td>${data[monthKey][i].in}</td>
    <td>${data[monthKey][i].out}</td>
    <td>${data[monthKey][i].late}</td>
@@ -224,11 +207,12 @@ function report(){
    <td>${data[monthKey][i].poya?'Yes':'No'}</td>
    </tr>`);
  }
-
  w.document.write("</table>");
 }
 
-</script>
+// Link Reset button
+document.getElementById("resetBtn").addEventListener("click", resetByDate);
 
+</script>
 </body>
 </html>

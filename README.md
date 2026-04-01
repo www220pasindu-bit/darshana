@@ -1,138 +1,191 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
-  <title>Shift Schedule</title>
-  <style>
-    body {
-      font-family: Arial, sans-serif;
-      background-color: #121212;
-      color: #fff;
-      text-align: center;
-      margin: 20px;
-    }
-    h2 {margin-bottom: 10px;}
-    table {border-collapse: collapse; width: 95%; margin: auto;}
-    th, td {border: 1px solid #fff; padding: 5px; text-align: center;}
-    th {background-color: #333;}
-    .today {background-color: #ffeb3b; color: #000; font-weight: bold;}
-    .dayShift {background-color: #4caf50; color: #000;}
-    .nightShift {background-color: #2196f3; color: #fff;}
-    input, button {margin: 5px; padding: 5px;}
-    .resetBtn {background-color: #f44336; color: #fff; border: none; padding: 8px 12px; cursor: pointer;}
-  </style>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Shift Attendance Tracker</title>
+<style>
+body { font-family: Arial; padding: 20px; }
+input, select { padding: 5px; margin: 5px; }
+button { padding: 8px 15px; margin: 5px; }
+table { border-collapse: collapse; margin-top: 20px; width: 100%; }
+th, td { border: 1px solid #ccc; padding: 8px; text-align: center; }
+.work { background-color: #c8f7c5; }
+.off { background-color: #f7c5c5; }
+.poya { background-color: #ffe4b5; }
+.marked { background-color: #f9d56e; }
+</style>
 </head>
 <body>
 
-<h2>Shift Schedule (2 Day / 2 Night)</h2>
+<h1>Shift Attendance Tracker</h1>
 
-<p>Current Time: <span id="time"></span></p>
+<h3>Employee Info</h3>
+Name: <input type="text" id="empName" placeholder="Employee Name">
+EPF: <input type="text" id="empEPF" placeholder="EPF Number">
+<button onclick="saveEmployee()">Save Info</button>
 
-<label>Employee Name: <input type="text" id="empName" placeholder="Enter name"></label>
-<label>EPF No: <input type="text" id="epfNo" placeholder="Enter EPF"></label><br>
+<h3>Select Month</h3>
+<select id="monthSelect" onchange="generateCalendar()">
+<option value="0">January</option>
+<option value="1">February</option>
+<option value="2">March</option>
+<option value="3">April</option>
+<option value="4">May</option>
+<option value="5">June</option>
+<option value="6">July</option>
+<option value="7">August</option>
+<option value="8">September</option>
+<option value="9">October</option>
+<option value="10">November</option>
+<option value="11">December</option>
+</select>
 
-<label>Start Date: <input type="date" id="start"></label>
-<button onclick="generateSchedule()">Generate</button>
-<button class="resetBtn" onclick="resetAttendance()">Reset Check In/Out</button>
+<h3>Actions</h3>
+<button onclick="checkIn()">Check-in</button>
+<button onclick="checkOut()">Check-out</button>
+<button onclick="resetDay()">Reset</button>
+<button onclick="generateReport()">Monthly Report</button>
 
-<table id="scheduleTable">
-  <thead>
-    <tr>
-      <th>Date</th>
-      <th>Day</th>
-      <th>Shift</th>
-      <th>Employee</th>
-      <th>EPF No</th>
-      <th>Check In</th>
-      <th>Check Out</th>
-    </tr>
-  </thead>
-  <tbody></tbody>
+<table id="calendar">
+<tr>
+<th>Date</th>
+<th>Shift</th>
+<th>Check-in</th>
+<th>Check-out</th>
+<th>Late (min)</th>
+<th>Poya</th>
+<th>Marked</th>
+</tr>
 </table>
 
 <script>
-// Live time display
-function updateTime() {
-  const now = new Date();
-  document.getElementById("time").innerText = now.toLocaleTimeString();
+// Shift pattern & Poya dates (example)
+const workPattern = ['Day','Day','Night','Night','Off','Off','Off'];
+const poyaDates = ['2026-04-05','2026-04-19','2026-05-04'];
+let shifts = [];
+let employee = {name:'', epf:''};
+
+// Save employee info
+function saveEmployee(){
+    const name = document.getElementById('empName').value.trim();
+    const epf = document.getElementById('empEPF').value.trim();
+    if(name && epf){
+        employee = {name, epf};
+        localStorage.setItem('employee', JSON.stringify(employee));
+        alert('Employee info saved!');
+    } else alert('Enter Name & EPF number!');
 }
-setInterval(updateTime, 1000);
-updateTime();
 
-let attendanceData = []; // Stores check in/out data
+// Shift & Poya helpers
+function getShift(index){ return workPattern[index % workPattern.length]; }
+function isPoya(dateStr){ return poyaDates.includes(dateStr); }
 
-function generateSchedule() {
-  const startInput = document.getElementById("start").value;
-  if (!startInput) return alert("Please select a start date");
+// Generate calendar
+function generateCalendar(){
+    shifts = [];
+    const calendar = document.getElementById('calendar');
+    calendar.innerHTML = `<tr>
+    <th>Date</th><th>Shift</th><th>Check-in</th><th>Check-out</th><th>Late (min)</th><th>Poya</th><th>Marked</th>
+    </tr>`;
 
-  const empName = document.getElementById("empName").value || "-";
-  const epfNo = document.getElementById("epfNo").value || "-";
+    const today = new Date();
+    const month = parseInt(document.getElementById('monthSelect').value);
+    const year = today.getFullYear();
+    const monthDays = new Date(year, month+1, 0).getDate();
+    const savedShifts = JSON.parse(localStorage.getItem('shifts')) || [];
+    const savedEmp = JSON.parse(localStorage.getItem('employee'));
+    if(savedEmp) employee = savedEmp;
 
-  const startDate = new Date(startInput);
-  const tbody = document.querySelector("#scheduleTable tbody");
-  tbody.innerHTML = "";
+    for(let i=1;i<=monthDays;i++){
+        const shift = getShift(i-1);
+        const dateStr = `${year}-${String(month+1).padStart(2,'0')}-${String(i).padStart(2,'0')}`;
+        const isPoyaDay = isPoya(dateStr);
+        const saved = savedShifts.find(s=>s.date===dateStr);
+        const record = saved || {date:dateStr, shift, checkIn:'', checkOut:'', late:0, marked:false, isPoya:isPoyaDay, employee:employee};
+        shifts.push(record);
 
-  const shifts = ["Day", "Day", "Night", "Night"];
-  let shiftIndex = 0;
-  const today = new Date();
-  const days = ["Sunday","Monday","Tuesday","Wednesday","Thursday","Friday","Saturday"];
-
-  attendanceData = []; // reset attendance
-
-  for (let i = 0; i < 30; i++) {
-    let current = new Date(startDate);
-    current.setDate(startDate.getDate() + i);
-
-    const shiftType = shifts[shiftIndex];
-    const shiftClass = shiftType === "Day" ? "dayShift" : "nightShift";
-
-    // Initialize attendance for this row
-    attendanceData.push({checkIn: "", checkOut: ""});
-
-    // Create row
-    const tr = document.createElement("tr");
-    if (current.toDateString() === today.toDateString()) {
-      tr.classList.add("today");
+        const tr = document.createElement('tr');
+        tr.id = 'day-'+i;
+        tr.className = record.isPoya ? 'poya' : (record.shift==='Off' ? 'off' : 'work');
+        if(record.marked) tr.className='marked';
+        tr.innerHTML = `<td>${i}</td><td>${shift}</td><td id="in-${i}">${record.checkIn}</td><td id="out-${i}">${record.checkOut}</td><td id="late-${i}">${record.late}</td><td>${record.isPoya?'Yes':'No'}</td><td><button onclick="markDay(${i})">Mark</button></td>`;
+        calendar.appendChild(tr);
     }
-
-    tr.innerHTML = `
-      <td>${current.toLocaleDateString('en-GB')}</td>
-      <td>${days[current.getDay()]}</td>
-      <td class="${shiftClass}">${shiftType}</td>
-      <td>${empName}</td>
-      <td>${epfNo}</td>
-      <td id="checkIn${i}"><button onclick="checkIn(${i})">Check In</button></td>
-      <td id="checkOut${i}"><button onclick="checkOut(${i})">Check Out</button></td>
-    `;
-    tbody.appendChild(tr);
-
-    shiftIndex = (shiftIndex + 1) % shifts.length;
-  }
+    localStorage.setItem('shifts', JSON.stringify(shifts));
 }
 
-function checkIn(index) {
-  const now = new Date().toLocaleTimeString();
-  attendanceData[index].checkIn = now;
-  document.getElementById(`checkIn${index}`).innerHTML = now;
+// Check-in
+function checkIn(){
+    const today = new Date().getDate();
+    const now = new Date();
+    const shiftStart = shifts[today-1].shift==='Day'?8:20;
+    const lateMins = now.getHours()>shiftStart ? (now.getHours()-shiftStart)*60+now.getMinutes() : 0;
+
+    shifts[today-1].checkIn = now.toLocaleTimeString();
+    shifts[today-1].late = lateMins;
+    shifts[today-1].employee = employee;
+
+    document.getElementById('in-'+today).innerText = shifts[today-1].checkIn;
+    document.getElementById('late-'+today).innerText = lateMins;
+    localStorage.setItem('shifts', JSON.stringify(shifts));
 }
 
-function checkOut(index) {
-  if (!attendanceData[index].checkIn) {
-    alert("Please Check In first!");
-    return;
-  }
-  const now = new Date().toLocaleTimeString();
-  attendanceData[index].checkOut = now;
-  document.getElementById(`checkOut${index}`).innerHTML = now;
+// Check-out
+function checkOut(){
+    const today = new Date().getDate();
+    const now = new Date();
+    shifts[today-1].checkOut = now.toLocaleTimeString();
+    document.getElementById('out-'+today).innerText = shifts[today-1].checkOut;
+    localStorage.setItem('shifts', JSON.stringify(shifts));
 }
 
-function resetAttendance() {
-  for (let i = 0; i < attendanceData.length; i++) {
-    attendanceData[i].checkIn = "";
-    attendanceData[i].checkOut = "";
-    document.getElementById(`checkIn${i}`).innerHTML = '<button onclick="checkIn('+i+')">Check In</button>';
-    document.getElementById(`checkOut${i}`).innerHTML = '<button onclick="checkOut('+i+')">Check Out</button>';
-  }
+// Reset
+function resetDay(){
+    const today = new Date().getDate();
+    shifts[today-1].checkIn='';
+    shifts[today-1].checkOut='';
+    shifts[today-1].late=0;
+    shifts[today-1].marked=false;
+    const tr = document.getElementById('day-'+today);
+    tr.className = shifts[today-1].isPoya?'poya':(shifts[today-1].shift==='Off'?'off':'work');
+    document.getElementById('in-'+today).innerText='';
+    document.getElementById('out-'+today).innerText='';
+    document.getElementById('late-'+today).innerText='';
+    localStorage.setItem('shifts', JSON.stringify(shifts));
 }
+
+// Mark manual day
+function markDay(day){
+    shifts[day-1].marked = !shifts[day-1].marked;
+    const tr = document.getElementById('day-'+day);
+    tr.className = shifts[day-1].marked?'marked':(shifts[day-1].isPoya?'poya':(shifts[day-1].shift==='Off'?'off':'work'));
+    localStorage.setItem('shifts', JSON.stringify(shifts));
+}
+
+// Generate monthly report
+function generateReport(){
+    let reportWindow = window.open("", "Monthly Report", "width=900,height=600");
+    reportWindow.document.write("<h1>Monthly Attendance Report</h1>");
+    reportWindow.document.write(`<h3>Employee: ${employee.name} | EPF: ${employee.epf}</h3>`);
+    reportWindow.document.write("<table border='1'><tr><th>Date</th><th>Shift</th><th>Check-in</th><th>Check-out</th><th>Late (min)</th><th>Poya</th><th>Marked</th></tr>");
+    shifts.forEach(s=>{
+        reportWindow.document.write(`<tr>
+        <td>${s.date.split('-')[2]}</td>
+        <td>${s.shift}</td>
+        <td>${s.checkIn}</td>
+        <td>${s.checkOut}</td>
+        <td>${s.late}</td>
+        <td>${s.isPoya?'Yes':'No'}</td>
+        <td>${s.marked?'Yes':'No'}</td>
+        </tr>`);
+    });
+    reportWindow.document.write("</table>");
+}
+
+// Init calendar on load
+generateCalendar();
+
 </script>
 
 </body>

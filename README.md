@@ -15,7 +15,7 @@ th {background:#333;}
 .offDay {background:#f44336; color:#fff;}
 .poya {background:#ffa726; color:#000;}
 .attended {background:#ffeb3b; color:#000;}
-input, button, select {padding:5px; margin:5px;}
+input, button {padding:5px; margin:5px;}
 .resetBtn {background:#f44336; color:#fff; border:none; padding:8px 12px; cursor:pointer;}
 </style>
 </head>
@@ -30,10 +30,7 @@ input, button, select {padding:5px; margin:5px;}
 <label>Start Date: <input type="date" id="start"></label>
 <button onclick="generateSchedule()">Generate Schedule</button>
 <button class="resetBtn" onclick="resetAll()">Reset All</button>
-<button onclick="generateReport()">Monthly Report</button><br>
-
-<label>Select Poya/Holiday Date: <input type="date" id="poyaDate"></label>
-<button onclick="markPoya()">Mark Poya / Holiday</button>
+<button onclick="generateReport()">Monthly Report</button>
 
 <table id="scheduleTable">
 <thead>
@@ -67,7 +64,6 @@ function generateSchedule(){
 
   for(let i=0;i<30;i++){
     let d = new Date(startDate); d.setDate(startDate.getDate()+i);
-    const dateStr = d.toISOString().split('T')[0];
     const shiftType = shifts[i % shifts.length];
     const shiftClass = shiftType==='Day'?'dayShift':(shiftType==='Night'?'nightShift':'offDay');
 
@@ -82,7 +78,7 @@ function generateSchedule(){
       <td id="out${i}"><button onclick="checkOut(${i})">Check Out</button></td>
       <td id="late${i}">0</td>
       <td id="off${i}">${shiftType==='Off'?'Off':'Work'}</td>
-      <td id="poya${i}">${attendanceData[i].poya?'Yes':'No'}</td>`;
+      <td id="poya${i}"><button onclick="markPoya(${i})">Mark Poya</button></td>`;
     tbody.appendChild(tr);
   }
 }
@@ -119,20 +115,11 @@ function calculateLate(i, now){
   document.getElementById('late'+i).innerText=late;
 }
 
-function markPoya(){
-  const selDate = document.getElementById('poyaDate').value;
-  if(!selDate) return alert('Select a date!');
-  for(let i=0;i<attendanceData.length;i++){
-    const rowDate = document.getElementById('row'+i).children[0].innerText;
-    const parts=rowDate.split('/');
-    const formatted = `2026-${parts[1].padStart(2,'0')}-${parts[0].padStart(2,'0')}`;
-    if(formatted===selDate){
-      attendanceData[i].poya=true;
-      document.getElementById('poya'+i).innerText='Yes';
-      document.getElementById('row'+i).classList.add('poya');
-      break;
-    }
-  }
+// Manual Poya button
+function markPoya(i){
+  attendanceData[i].poya=true;
+  document.getElementById('poya'+i).innerHTML='Yes';
+  document.getElementById('row'+i).classList.add('poya');
 }
 
 function resetAll(){
@@ -142,7 +129,7 @@ function resetAll(){
     document.getElementById('out'+i).innerHTML='<button onclick="checkOut('+i+')">Check Out</button>';
     document.getElementById('late'+i).innerText='0';
     document.getElementById('off'+i).innerText=attendanceData[i].off?'Off':'Work';
-    document.getElementById('poya'+i).innerText=attendanceData[i].poya?'Yes':'No';
+    document.getElementById('poya'+i).innerHTML='<button onclick="markPoya('+i+')">Mark Poya</button>';
     document.getElementById('row'+i).classList.remove('attended','poya');
   }
 }

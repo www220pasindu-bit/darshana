@@ -33,6 +33,13 @@ Start Date: <input type="date" id="start">
 <button onclick="generate()">Generate</button>
 <button onclick="report()">Report</button>
 
+<br><br>
+
+<!-- ✅ NEW DATE RESET -->
+<label>Select Date to Reset: </label>
+<input type="date" id="resetDate">
+<button onclick="resetByDate()">Reset Selected Date</button>
+
 <table id="tbl">
 <thead>
 <tr>
@@ -158,15 +165,38 @@ function poya(i){
  saveReload();
 }
 
-// reset single day
+// reset single row
 function resetDay(i){
  const monthKey=Object.keys(data).slice(-1)[0];
-
  data[monthKey][i]={in:'',out:'',late:0,off:true,poya:false};
  saveReload();
 }
 
-// save + reload UI
+// ✅ RESET BY DATE
+function resetByDate(){
+  const sel = document.getElementById("resetDate").value;
+  if(!sel) return alert("Select date!");
+
+  const monthKey = Object.keys(data).slice(-1)[0];
+
+  for(let i=0;i<data[monthKey].length;i++){
+
+    const rowDate = document.getElementById("r"+i).children[0].innerText;
+    const parts = rowDate.split('/');
+    const formatted = `${parts[2]}-${parts[1]}-${parts[0]}`;
+
+    if(formatted === sel){
+      data[monthKey][i]={in:'',out:'',late:0,off:true,poya:false};
+      saveReload();
+      alert("Selected day reset!");
+      return;
+    }
+  }
+
+  alert("Date not found!");
+}
+
+// save reload
 function saveReload(){
  localStorage.setItem("shiftData",JSON.stringify(data));
  generate();

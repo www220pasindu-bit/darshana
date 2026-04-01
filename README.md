@@ -1,139 +1,105 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
-  <title>Shift Schedule</title>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Fingerprint Shift App</title>
   <style>
-    body {
-      font-family: Arial, sans-serif;
-      background-color: #121212;
-      color: #fff;
-      text-align: center;
-      margin: 20px;
-    }
-    h2 {margin-bottom: 10px;}
-    table {border-collapse: collapse; width: 95%; margin: auto;}
-    th, td {border: 1px solid #fff; padding: 5px; text-align: center;}
-    th {background-color: #333;}
-    .today {background-color: #ffeb3b; color: #000; font-weight: bold;}
-    .dayShift {background-color: #4caf50; color: #000;}
-    .nightShift {background-color: #2196f3; color: #fff;}
-    input, button {margin: 5px; padding: 5px;}
-    .resetBtn {background-color: #f44336; color: #fff; border: none; padding: 8px 12px; cursor: pointer;}
+    body { font-family: Arial; padding: 20px; }
+    button { padding: 10px 20px; margin: 5px; }
+    table { border-collapse: collapse; margin-top: 20px; width: 100%; }
+    th, td { border: 1px solid #ccc; padding: 8px; text-align: center; }
+    .work { background-color: #c8f7c5; }
+    .off { background-color: #f7c5c5; }
   </style>
 </head>
 <body>
+  <h1>Shift Attendance Tracker</h1>
+  <button onclick="checkIn()">Check-in</button>
+  <button onclick="checkOut()">Check-out</button>
+  <button onclick="resetDay()">Reset</button>
 
-<h2>Shift Schedule (2 Day / 2 Night)</h2>
-
-<p>Current Time: <span id="time"></span></p>
-
-<label>Employee Name: <input type="text" id="empName" placeholder="Enter name"></label>
-<label>EPF No: <input type="text" id="epfNo" placeholder="Enter EPF"></label><br>
-
-<label>Start Date: <input type="date" id="start"></label>
-<button onclick="generateSchedule()">Generate</button>
-<button class="resetBtn" onclick="resetAttendance()">Reset Check In/Out</button>
-
-<table id="scheduleTable">
-  <thead>
+  <table id="calendar">
     <tr>
       <th>Date</th>
-      <th>Day</th>
       <th>Shift</th>
-      <th>Employee</th>
-      <th>EPF No</th>
-      <th>Check In</th>
-      <th>Check Out</th>
+      <th>Check-in</th>
+      <th>Check-out</th>
+      <th>Late (min)</th>
     </tr>
-  </thead>
-  <tbody></tbody>
-</table>
+  </table>
 
-<script>
-// Live time display
-function updateTime() {
-  const now = new Date();
-  document.getElementById("time").innerText = now.toLocaleTimeString();
-}
-setInterval(updateTime, 1000);
-updateTime();
+  <script>
+    // Shift pattern: 4-on, 3-off (Day/Night rotation)
+    const workPattern = ['Day','Day','Night','Night','Off','Off','Off'];
+    const shifts = [];
 
-let attendanceData = []; // Stores check in/out data
-
-function generateSchedule() {
-  const startInput = document.getElementById("start").value;
-  if (!startInput) return alert("Please select a start date");
-
-  const empName = document.getElementById("empName").value || "-";
-  const epfNo = document.getElementById("epfNo").value || "-";
-
-  const startDate = new Date(startInput);
-  const tbody = document.querySelector("#scheduleTable tbody");
-  tbody.innerHTML = "";
-
-  const shifts = ["Day", "Day", "Night", "Night"];
-  let shiftIndex = 0;
-  const today = new Date();
-  const days = ["Sunday","Monday","Tuesday","Wednesday","Thursday","Friday","Saturday"];
-
-  attendanceData = []; // reset attendance
-
-  for (let i = 0; i < 30; i++) {
-    let current = new Date(startDate);
-    current.setDate(startDate.getDate() + i);
-
-    const shiftType = shifts[shiftIndex];
-    const shiftClass = shiftType === "Day" ? "dayShift" : "nightShift";
-
-    // Initialize attendance for this row
-    attendanceData.push({checkIn: "", checkOut: ""});
-
-    // Create row
-    const tr = document.createElement("tr");
-    if (current.toDateString() === today.toDateString()) {
-      tr.classList.add("today");
+    function getShift(dateIndex){
+      return workPattern[dateIndex % workPattern.length];
     }
 
-    tr.innerHTML = `
-      <td>${current.toLocaleDateString('en-GB')}</td>
-      <td>${days[current.getDay()]}</td>
-      <td class="${shiftClass}">${shiftType}</td>
-      <td>${empName}</td>
-      <td>${epfNo}</td>
-      <td id="checkIn${i}"><button onclick="checkIn(${i})">Check In</button></td>
-      <td id="checkOut${i}"><button onclick="checkOut(${i})">Check Out</button></td>
-    `;
-    tbody.appendChild(tr);
+    function initCalendar(){
+      const calendar = document.getElementById('calendar');
+      const today = new Date();
+      const monthDays = new Date(today.getFullYear(), today.getMonth()+1, 0).getDate();
 
-    shiftIndex = (shiftIndex + 1) % shifts.length;
-  }
-}
+      for(let i=1; i<=monthDays; i++){
+        const shift = getShift(i-1);
+        shifts.push({date: i, shift, checkIn: '', checkOut: '', late: 0});
+        const tr = document.createElement('tr');
+        tr.id = 'day-'+i;
+        tr.className = shift==='Off' ? 'off' : 'work';
+        tr.innerHTML = `<td>${i}</td><td>${shift}</td><td id="in-${i}"></td><td id="out-${i}"></td><td id="late-${i}"></td>`;
+        calendar.appendChild(tr);
+      }
 
-function checkIn(index) {
-  const now = new Date().toLocaleTimeString();
-  attendanceData[index].checkIn = now;
-  document.getElementById(`checkIn${index}`).innerHTML = now;
-}
+      // Load saved data from localStorage
+      const saved = JSON.parse(localStorage.getItem('shifts'));
+      if(saved){
+        saved.forEach(s => {
+          if(s.checkIn) document.getElementById('in-'+s.date).innerText = s.checkIn;
+          if(s.checkOut) document.getElementById('out-'+s.date).innerText = s.checkOut;
+          if(s.late) document.getElementById('late-'+s.date).innerText = s.late;
+        });
+      }
+    }
 
-function checkOut(index) {
-  if (!attendanceData[index].checkIn) {
-    alert("Please Check In first!");
-    return;
-  }
-  const now = new Date().toLocaleTimeString();
-  attendanceData[index].checkOut = now;
-  document.getElementById(`checkOut${index}`).innerHTML = now;
-}
+    function checkIn(){
+      const today = new Date().getDate();
+      const now = new Date();
+      shifts[today-1].checkIn = now.toLocaleTimeString();
 
-function resetAttendance() {
-  for (let i = 0; i < attendanceData.length; i++) {
-    attendanceData[i].checkIn = "";
-    attendanceData[i].checkOut = "";
-    document.getElementById(`checkIn${i}`).innerHTML = '<button onclick="checkIn('+i+')">Check In</button>';
-    document.getElementById(`checkOut${i}`).innerHTML = '<button onclick="checkOut('+i+')">Check Out</button>';
-  }
-}
-</script>
+      // Late logic: Day shift 08:00, Night shift 20:00
+      const shiftStart = shifts[today-1].shift === 'Day' ? 8 : 20;
+      const lateHours = now.getHours() - shiftStart;
+      const lateMinutes = lateHours > 0 ? lateHours*60 + now.getMinutes() : 0;
+      shifts[today-1].late = lateMinutes;
 
+      document.getElementById('in-'+today).innerText = shifts[today-1].checkIn;
+      document.getElementById('late-'+today).innerText = shifts[today-1].late;
+      localStorage.setItem('shifts', JSON.stringify(shifts));
+    }
+
+    function checkOut(){
+      const today = new Date().getDate();
+      const now = new Date();
+      shifts[today-1].checkOut = now.toLocaleTimeString();
+      document.getElementById('out-'+today).innerText = shifts[today-1].checkOut;
+      localStorage.setItem('shifts', JSON.stringify(shifts));
+    }
+
+    function resetDay(){
+      const today = new Date().getDate();
+      shifts[today-1].checkIn = '';
+      shifts[today-1].checkOut = '';
+      shifts[today-1].late = 0;
+      document.getElementById('in-'+today).innerText = '';
+      document.getElementById('out-'+today).innerText = '';
+      document.getElementById('late-'+today).innerText = '';
+      localStorage.setItem('shifts', JSON.stringify(shifts));
+    }
+
+    initCalendar();
+  </script>
 </body>
 </html>
